@@ -1,0 +1,15 @@
+[Unit]
+Description=Edge Node Monitor Flask Service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/edge-node
+Environment=EDGE_TOKEN=
+ExecStart=/usr/bin/python3 /home/pi/edge-node/app.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

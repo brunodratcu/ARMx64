@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Edge Node Monitor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 24px;
+    }
+
+    .card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+
+    h1, h2 {
+      margin-top: 0;
+    }
+
+    .button {
+      display: inline-block;
+      background: #2563eb;
+      color: white;
+      text-decoration: none;
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+
+    .button:hover {
+      background: #1d4ed8;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .metric {
+      background: #1e293b;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+    }
+
+    .label {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .value {
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+    pre {
+      background: #020617;
+      color: #cbd5e1;
+      padding: 16px;
+      border-radius: 12px;
+      overflow-x: auto;
+      border: 1px solid #1e293b;
+    }
+
+    .error {
+      color: #fecaca;
+      background: #7f1d1d;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #b91c1c;
+    }
+
+    .muted {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    code {
+      background: #1e293b;
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Edge Node Monitor</h1>
+      <p class="muted">
+        Dispositivo Raspberry Pi com coleta local em Assembly ARM64 e interface HTTP em Flask.
+      </p>
+
+      <a class="button" href="/view">Consultar métricas</a>
+      <a class="button" href="/metrics">Ver JSON</a>
+      <a class="button" href="/health">Health</a>
+    </div>
+
+    {% if error %}
+      <div class="card">
+        <h2>Erro</h2>
+        <div class="error">{{ error }}</div>
+      </div>
+    {% endif %}
+
+    {% if metrics %}
+      <div class="card">
+        <h2>Resumo do nó</h2>
+        <p><strong>Hostname:</strong> {{ hostname }}</p>
+        <p><strong>Timestamp UTC:</strong> {{ timestamp }}</p>
+      </div>
+
+      <div class="grid">
+        <div class="metric">
+          <div class="label">Memória Total</div>
+          <div class="value">{{ metrics.mem_total_kb }} kB</div>
+        </div>
+        <div class="metric">
+          <div class="label">Memória Disponível</div>
+          <div class="value">{{ metrics.mem_available_kb }} kB</div>
+        </div>
+        <div class="metric">
+          <div class="label">Memória em Uso</div>
+          <div class="value">{{ metrics.mem_used_kb }} kB</div>
+        </div>
+        <div class="metric">
+          <div class="label">Uso de Memória</div>
+          <div class="value">{{ metrics.mem_used_percent }}%</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Saída bruta do Assembly</h2>
+        <pre>{{ raw }}</pre>
+      </div>
+    {% endif %}
+
+    <div class="card">
+      <h2>Como acessar</h2>
+      <p>Abra no navegador:</p>
+      <pre>http://IP_DO_PI:5000</pre>
+      <p>Ou consulte diretamente o endpoint:</p>
+      <pre>curl http://IP_DO_PI:5000/metrics</pre>
+    </div>
+  </div>
+</body>
+</html>
