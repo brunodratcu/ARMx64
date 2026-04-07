@@ -349,14 +349,4 @@ Você terá um:
 
 👉 **nó edge de monitoramento com processamento em Assembly e acesso remoto via HTTP**
 
----
 
-# 🔜 Próximos passos recomendados
-
-* Adicionar CPU (`/proc/stat`)
-* Salvar histórico
-* Criar coleta contínua
-* Implementar autenticação por token
-* Integrar com sistema de predição
-
----
