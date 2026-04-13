@@ -60,7 +60,7 @@ pi-edge-node/
 ### 1. Acessa o Pi via SSH
 
 ```bash
-ssh deniederror@<ip-do-pi>
+ssh pi@<ip-do-pi>
 ```
 
 ### 2. Cria os arquivos no Pi
@@ -174,58 +174,6 @@ sudo tailscale ip -4
 | DNS local | `http://pi.local:5000` |
 | Tailscale (remoto) | `http://<tailscale-ip>:5000` |
 | Funnel público | `https://NOME.tail1234.ts.net` |
-
----
-
-## Deploy no GitHub Pages
-
-### 1. Cria o repositório no GitHub
-
-Vai em [github.com/new](https://github.com/new) e cria o repo `pi-edge-node`.
-
-### 2. Adiciona o secret com a URL do Funnel
-
-Repositório → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**:
-
-```
-Name:  PI_FUNNEL_URL
-Value: https://SEU-NODE.tail1234.ts.net
-```
-
-### 3. Ativa o GitHub Pages
-
-Settings → **Pages** → Source: **GitHub Actions**
-
-### 4. Sobe o código
-
-```bash
-git init
-git add .
-git commit -m "feat: Pi Edge Node inicial"
-git remote add origin https://github.com/SEU-USUARIO/pi-edge-node.git
-git branch -M main
-git push -u origin main
-```
-
-O Actions roda automaticamente, injeta a URL do Funnel e publica a página em:
-
-```
-https://SEU-USUARIO.github.io/pi-edge-node
-```
-
-### Como funciona o deploy
-
-```
-git push → GitHub Actions:
-  1. Faz checkout do código
-  2. Gera config.js com a URL do secret PI_FUNNEL_URL
-  3. Publica no GitHub Pages
-
-Usuário abre a página:
-  → fetch() para PI_FUNNEL_URL/health (timeout 6s)
-  → Pi responde → ONLINE (verde) + métricas
-  → Pi silêncio → OFFLINE (vermelho) + retry 20s
-```
 
 ---
 
