@@ -1,15 +1,21 @@
 [Unit]
-Description=Edge Node Monitor Flask Service
-After=network.target
+Description=Pi Edge Node Flask
+After=network-online.target piedge-ap.service
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/edge-node
-Environment=EDGE_TOKEN=
-ExecStart=/usr/bin/python3 /home/pi/edge-node/app.py
+User=deniederror
+WorkingDirectory=/home/deniederror/pi-edge-node
+Environment="PORT=5000"
+Environment="WAN_IFACE=wlan1"
+Environment="AP_IFACE=wlan0"
+ExecStart=/home/deniederror/pi-edge-node/venv/bin/python server.py
 Restart=always
-RestartSec=3
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=piserver
 
 [Install]
 WantedBy=multi-user.target

@@ -1,233 +1,187 @@
-# Pi Edge Node
+# Pi Edge Node — Documentação
 
-Servidor de monitoramento rodando em **Raspberry Pi 4B**, com Access Point Wi-Fi próprio, dashboard web e acesso remoto via Tailscale Funnel. Uma página hospedada no GitHub Pages detecta automaticamente se o Pi está online ou offline.
+## Hardware
+- Raspberry Pi 4B
+- Adaptador USB Wi-Fi: LV-UW06 (chip Realtek, driver rtl8xxxu — nativo no kernel)
 
----
-
-## Arquitetura
-
+## Topologia
 ```
-[Internet]
-    │
-  wlan1 (adaptador USB RTL8188FTV — recebe internet)
-    │
-[Raspberry Pi 4B — Debian 13]
-    │
-  wlan0 (AP nativo — transmite PiEdge-Net)
-    │
-[Dispositivos conectados — 10.0.0.x]
-
-Acesso remoto:
-[Browser] → [GitHub Pages] → fetch() → [Tailscale Funnel] → [Pi :5000]
+wlan1 (USB LV-UW06) ──→ Pi 4B ──→ wlan0 (AP PiEdge-Net)
+     ↑                                      ↓
+    SuaRede                     clientes Wi-Fi
+  (internet)                       (10.0.0.x)
 ```
 
----
+## Interfaces
+| Interface | Função | IP |
+|-----------|--------|----|
+| wlan1 | USB adapter — cliente Wi-Fi (internet) | DHCP da sua rede |
+| wlan0 | AP interno do Pi — PiEdge-Net | 10.0.0.1 |
+| eth0 | Ethernet (não usado atualmente) | — |
+| tailscale0 | Acesso remoto | IP Tailscale |
 
-## Estrutura do repositório
+## Redes Wi-Fi
+| SSID | Senha | Função |
+|------|-------|--------|
+| SuaRede | SuaSenha | Internet (via wlan1) |
+| PiEdge-Net | piedge2024 | AP do Pi (via wlan0) |
 
+## Arquivos do sistema
+| Arquivo | Destino | Função |
+|---------|---------|--------|
+| piedge-ap.sh | /usr/local/bin/ | Script de boot do AP |
+| piedge-ap.service | /etc/systemd/system/ | Serviço systemd do AP |
+| hostapd.conf | /etc/hostapd/ | Configuração do AP |
+| dnsmasq-piedge.conf | /etc/dnsmasq.d/ | DHCP para clientes AP |
+| server.py | ~/pi-edge-node/ | Servidor Flask |
+| piserver.service | /etc/systemd/system/ | Serviço Flask |
+
+## Estrutura de pastas
 ```
-pi-edge-node/
-├── .github/
-│   └── workflows/
-│       └── deploy.yml     # CI/CD — injeta URL e faz deploy no GitHub Pages
-├── static/
-│   ├── online.html        # Dashboard (servido pelo Flask quando Pi está up)
-│   └── offline.html       # Fallback (referência)
-├── index.html             # Página pública — detecta online/offline via fetch()
-├── config.js              # URL do Tailscale (local apenas, no .gitignore)
-├── server.py              # Servidor Flask — rotas /, /health, /metrics
-├── setup.sh               # Instalador completo para o Pi
-├── .gitignore
-└── README.md
+/home/PI/pi-edge-node/
+├── server.py
+├── venv/
+└── static/
+    ├── online.html
+    └── offline.html
 ```
 
----
-
-## Pré-requisitos
-
-| Item | Detalhe |
-|---|---|
-| Hardware | Raspberry Pi 4B |
-| Sistema | Debian 13 (Bookworm) |
-| Adaptador Wi-Fi | USB RTL8188FTV (wlan1) |
-| Conta | Tailscale (gratuita — tailscale.com) |
-| Conta | GitHub (para GitHub Pages) |
-
----
-
-## Instalação no Pi
-
-### 1. Acessa o Pi via SSH
-
+## Serviços systemd
 ```bash
-ssh pi@<ip-do-pi>
+# Status
+sudo systemctl status piedge-ap
+sudo systemctl status hostapd
+sudo systemctl status dnsmasq
+sudo systemctl status piserver
+
+# Reiniciar
+sudo systemctl restart piedge-ap
+sudo systemctl restart hostapd
 ```
 
-### 2. Cria os arquivos no Pi
+## Instalação do zero (Pi formatado)
 
-**server.py:**
+### 1. Instalar dependências
 ```bash
-cat > ~/server.py << 'EOF'
-# cole o conteúdo de server.py aqui
-EOF
+sudo apt-get update
+sudo apt-get install -y python3 python3-pip python3-venv \
+    hostapd dnsmasq iptables-persistent \
+    network-manager firmware-misc-nonfree \
+    net-tools wireless-tools
 ```
 
-**setup.sh:**
+### 2. Conectar wlan1 (USB) na internet
 ```bash
-cat > ~/setup.sh << 'EOF'
-# cole o conteúdo de setup.sh aqui
-EOF
+# Plugar o adaptador USB primeiro
+sudo nmcli connection add \
+    type wifi ifname wlan1 con-name "BrunoDratcu" \
+    ssid "SuaRede" \
+    wifi-sec.key-mgmt wpa-psk \
+    wifi-sec.psk "SuaSenha" \
+    connection.autoconnect yes
+sudo nmcli connection up "SuaRede" ifname wlan1
 ```
 
-**Páginas HTML** (pasta static):
+### 3. Instalar script do AP
 ```bash
-mkdir -p ~/static
-cat > ~/static/online.html  << 'EOF'
-# cole o conteúdo de static/online.html aqui
-EOF
-
-cat > ~/static/offline.html << 'EOF'
-# cole o conteúdo de static/offline.html aqui
-EOF
+sudo cp piedge-ap.sh /usr/local/bin/
+sudo chmod +x /usr/local/bin/piedge-ap.sh
+sudo cp piedge-ap.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable piedge-ap
 ```
 
-> **Dica:** se preferir clonar do GitHub diretamente:
-> ```bash
-> git clone https://github.com/SEU-USUARIO/pi-edge-node ~/pi-edge-node
-> cd ~/pi-edge-node
-> ```
-
-### 3. Roda o instalador
-
+### 4. Configurar hostapd
 ```bash
-chmod +x ~/setup.sh
-sudo ~/setup.sh
+sudo systemctl unmask hostapd
+sudo cp hostapd.conf /etc/hostapd/hostapd.conf
+sudo systemctl enable hostapd
 ```
 
-O script instala automaticamente:
-- Driver RTL8188FTV (DKMS)
-- Python 3 + Flask (venv isolado)
-- hostapd (Access Point)
-- dnsmasq (DHCP + DNS local)
-- NAT wlan1 → wlan0
-- Tailscale
-- Serviço systemd `piserver`
-
-### 4. Conecta wlan1 na internet
-
+### 5. Configurar dnsmasq
 ```bash
-sudo nmcli device wifi connect "NomeDaRede" password "SenhaDaRede" ifname wlan1
+sudo cp dnsmasq-piedge.conf /etc/dnsmasq.d/piedge-ap.conf
+sudo systemctl enable dnsmasq
 ```
 
-### 5. Autentica no Tailscale
-
+### 6. Instalar Flask
 ```bash
+mkdir -p ~/pi-edge-node/static
+cd ~/pi-edge-node
+python3 -m venv venv
+venv/bin/pip install flask
+cp server.py ~/pi-edge-node/
+```
+
+### 7. Instalar serviço Flask
+```bash
+sudo cp piserver.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable piserver
+```
+
+### 8. Tailscale
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 ```
 
-Abre o link gerado no navegador e faz login com Google ou GitHub.
-
-### 6. Ativa o Tailscale Funnel (URL pública)
-
-```bash
-sudo tailscale funnel 5000
-```
-
-Anota a URL gerada — formato `https://NOME.tail1234.ts.net`. Você vai precisar dela para o GitHub Pages.
-
-### 7. Reinicia o Pi
-
+### 9. Reboot
 ```bash
 sudo reboot
 ```
 
-Após o boot (~30s), todos os serviços sobem automaticamente.
-
----
-
 ## Verificação pós-boot
-
 ```bash
-# Serviços rodando?
-sudo systemctl status piserver hostapd dnsmasq tailscaled
+# Interfaces
+nmcli device status
+ip addr show wlan0   # deve ter 10.0.0.1
+ip addr show wlan1   # deve ter IP do Bruno Dratcu
 
-# Flask respondendo?
-curl http://localhost:5000/health
+# Serviços
+sudo systemctl status piedge-ap hostapd dnsmasq piserver
 
-# Métricas completas?
-curl http://localhost:5000/metrics
+# Internet no Pi
+ping -c 3 -I wlan1 8.8.8.8
 
-# Clientes conectados no AP?
-cat /var/lib/misc/dnsmasq.leases
-
-# IP Tailscale?
-sudo tailscale ip -4
+# Flask
+curl http://10.0.0.1:5000/health
+curl http://10.0.0.1:5000/metrics
 ```
 
----
-
-## Acesso
-
-| Contexto | URL |
-|---|---|
-| Conectado no PiEdge-Net | `http://10.0.0.1:5000` |
-| DNS local | `http://pi.local:5000` |
-| Tailscale (remoto) | `http://<tailscale-ip>:5000` |
-| Funnel público | `https://NOME.tail1234.ts.net` |
-
----
-
-## Rede Wi-Fi (AP)
-
-| Parâmetro | Valor |
-|---|---|
-| SSID | `PiEdge-Net` |
-| Senha padrão | `piedge2024` |
-| Segurança | WPA2-PSK |
-| Gateway | `10.0.0.1` |
-| Range DHCP | `10.0.0.10` – `10.0.0.100` |
-| DNS local | `pi.local` → `10.0.0.1` |
-
-**Trocar a senha do AP:**
+## Acesso remoto
 ```bash
-sudo nano /etc/hostapd/hostapd.conf
-# alterar: wpa_passphrase=NovaSenha
-sudo systemctl restart hostapd
+# SSH pelo Tailscale
+ssh pi@ID_PI.local
+
+# Funnel (expõe Flask na internet)
+sudo tailscale funnel 5000
+# URL: https://tail4e04f3.ts.net/
 ```
 
----
+## Solução de problemas
 
-## API do servidor
-
-| Rota | Retorno |
-|---|---|
-| `GET /` | Dashboard HTML |
-| `GET /health` | `{"status":"ok","uptime":"...","timestamp":...}` |
-| `GET /metrics` | RAM, CPU, temperatura, clientes AP, IP Tailscale |
-
----
-
-## Serviços systemd
-
-| Serviço | Função |
-|---|---|
-| `piserver` | Servidor Flask na porta 5000 |
-| `hostapd` | Access Point Wi-Fi (wlan0) |
-| `dnsmasq` | DHCP + DNS local |
-| `tailscaled` | VPN WireGuard (Tailscale) |
-
+### PiEdge-Net não aparece
 ```bash
-# Logs em tempo real
-sudo journalctl -u piserver -f
+sudo systemctl restart piedge-ap
+sudo journalctl -u hostapd --no-pager -n 20
 ```
 
----
+### Sem internet no celular
+```bash
+# Verifica forwarding
+cat /proc/sys/net/ipv4/ip_forward   # deve ser 1
 
-## Expansão planejada
+# Verifica NAT
+sudo iptables -t nat -L POSTROUTING -n -v
 
-- [ ] Assembly binary `ram_integrity.s` para verificação de integridade de RAM
-- [ ] Hub server com proxy `/proxy/<token>/metrics`
-- [ ] Autenticação por token nas rotas da API
-- [ ] Dashboard com atualização automática de métricas em tempo real
+# Verifica wlan1
+ip addr show wlan1
+ping -c 3 -I wlan1 8.8.8.8
+```
 
----
+### wlan0 perdeu IP
+```bash
+sudo ip addr add 10.0.0.1/24 dev wlan0
+sudo systemctl restart dnsmasq
+```
