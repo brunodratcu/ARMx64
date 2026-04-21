@@ -14,6 +14,23 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 WAN = os.environ.get("WAN_IFACE", "wlan1")
 AP  = os.environ.get("AP_IFACE",  "wlan0")
 
+
+def clients():
+    out = []
+    try:
+        with open("/var/lib/misc/dnsmasq.leases") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 4:
+                    out.append({
+                        "mac": parts[1],
+                        "ip": parts[2],
+                        "hostname": parts[3]
+                    })
+    except:
+        pass
+    return out
+
 def _read(p, d=None):
     try:
         with open(p) as f: return f.read().strip()
@@ -57,6 +74,14 @@ def ap_clients():
         with open("/var/lib/misc/dnsmasq.leases") as f:
             return len([l for l in f if l.strip()])
     except: return None
+
+
+@app.route("/clients")
+def get_clients():
+    return jsonify({
+        "count": len(clients()),
+        "devices": clients()
+    })
 
 @app.route("/")
 def index(): return send_from_directory(STATIC_DIR,"online.html")
@@ -114,6 +139,29 @@ def metrics():
             "tailscale_ip":(_run("tailscale","ip","-4") or None)
         }
     })
+
+
+def internet_ok():
+    try:
+        subprocess.run(
+            ["ping", "-c", "1", "-W", "1", "8.8.8.8"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return True
+    except:
+        return False
+
+@app.route("/status")
+def status():
+    return jsonify({
+        "wan_ok": internet_ok(),
+        "wan_ip": iface_ip(WAN),
+        "ap_ip": iface_ip(AP),
+        "ap_clients": len(clients()),
+        "uptime": fmt(time.time() - START_TIME)
+    })
+
 
 if __name__=="__main__":
     port=int(os.environ.get("PORT",5000))
