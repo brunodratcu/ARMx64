@@ -1,24 +1,2 @@
 config.js
-# manter setup local fora do repositório
-setup.sh
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.venv/
-venv/
-
-# Banco e logs
-*.db
-*.sqlite3
-*.log
-
-# Ambiente
-.env
-.env.*
-
-# Sistema
-.DS_Store
 setup.sh
